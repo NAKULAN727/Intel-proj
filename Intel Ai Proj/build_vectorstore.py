@@ -1,0 +1,57 @@
+"""
+Vector database creation using ChromaDB and sentence transformers
+"""
+import chromadb
+from sentence_transformers import SentenceTransformer
+import os
+
+class VectorStore:
+    def __init__(self, collection_name="pdf_knowledge", model_name="sentence-transformers/all-MiniLM-L6-v2"):
+        """Initialize vector store with embedding model"""
+        self.client = chromadb.PersistentClient(path="./chroma_db")
+        self.collection_name = collection_name
+        self.embedding_model = SentenceTransformer(model_name)
+        
+        # Create or get collection
+        try:
+            self.collection = self.client.get_collection(collection_name)
+        except Exception as e:
+            print(f"Collection not found, creating new one: {e}")
+            self.collection = self.client.create_collection(collection_name)
+    
+    def add_documents(self, texts):
+        """Add text chunks to vector database"""
+        # Generate embeddings
+        embeddings = self.embedding_model.encode(texts)
+        
+        # Create IDs and metadata
+        ids = [f"chunk_{i}" for i in range(len(texts))]
+        metadatas = [{"text": text} for text in texts]
+        
+        # Add to collection
+        try:
+            self.collection.add(
+                embeddings=embeddings.tolist(),
+                documents=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
+            print(f"Added {len(texts)} chunks to vector database")
+        except Exception as e:
+            print(f"Error adding documents: {e}")
+            raise
+    
+    def search(self, query, n_results=3):
+        """Search for relevant chunks"""
+        try:
+            query_embedding = self.embedding_model.encode([query])
+            
+            results = self.collection.query(
+                query_embeddings=query_embedding.tolist(),
+                n_results=n_results
+            )
+            
+            return results['documents'][0] if results['documents'] else []
+        except Exception as e:
+            print(f"Error searching: {e}")
+            return []
