@@ -41,17 +41,33 @@ class VectorStore:
             print(f"Error adding documents: {e}")
             raise
     
-    def search(self, query, n_results=3):
-        """Search for relevant chunks"""
+    def clear(self):
+        """Clear all documents from the collection"""
+        try:
+            self.client.delete_collection(self.collection_name)
+            self.collection = self.client.create_collection(self.collection_name)
+            print("✅ Collection cleared successfully")
+        except Exception as e:
+            print(f"Error clearing collection: {e}")
+
+    
+    def search_with_score(self, query, n_results=3):
+        """Search and return docs with their distances"""
         try:
             query_embedding = self.embedding_model.encode([query])
             
             results = self.collection.query(
                 query_embeddings=query_embedding.tolist(),
-                n_results=n_results
+                n_results=n_results,
+                include=['documents', 'distances']
             )
             
-            return results['documents'][0] if results['documents'] else []
+            return results['documents'][0], results['distances'][0]
         except Exception as e:
             print(f"Error searching: {e}")
-            return []
+            return [], []
+
+    def search(self, query, n_results=3):
+        """Wrapper for backward compatibility"""
+        docs, _ = self.search_with_score(query, n_results)
+        return docs

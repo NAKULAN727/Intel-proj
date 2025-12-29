@@ -21,30 +21,50 @@ class PDFQueryEngine:
             if not question.strip():
                 return "Please provide a valid question."
             
-            # Retrieve relevant chunks
-            relevant_chunks = self.vector_store.search(question, n_results=3)
+            # Retrieve relevant chunks with scores
+            relevant_chunks, scores = self.vector_store.search_with_score(question, n_results=3)
             
-            if not relevant_chunks:
-                return "No relevant information found in the PDF."
+            # Debug: Print scores to help tune threshold
+            if scores:
+                print(f"DEBUG: Query '{question}' - Top Score: {scores[0]}")
+
+            # Simple thresholding: L2 Distance. Lower is better.
+            # 0.0 = exact match. > 1.4 is usually getting into "unrelated" territory for MiniLM.
+            if not relevant_chunks or (scores and scores[0] > 1.4): 
+                return "This content is not related to the PDF content provided."
             
             # Combine context
             context = "\n\n".join(relevant_chunks)
             
-            # Create prompt for T5 model
-            prompt = f"Answer the question based on the context.\n\nContext: {context}\n\nQuestion: {question}\n\nAnswer:"
+            # Create stricter prompt for T5 model
+            prompt = (
+                f"You are an intelligent assistant analyzing a document. "
+                f"Answer the question below using ONLY the provided Context. "
+                f"If the Context does not contain the answer, explicitly state: 'This content is not related to the PDF content provided'.\n\n"
+                f"Context:\n{context}\n\n"
+                f"Question: {question}\n\n"
+                f"Answer:"
+            )
             
             # Tokenize and generate
-            inputs = self.tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True)
+            inputs = self.tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
             
             outputs = self.model.generate(
                 inputs.input_ids,
                 max_length=150,
+                min_length=10,
                 num_beams=4,
+                length_penalty=1.0, # Reduce penalty to avoid forced length
                 early_stopping=True,
-                temperature=0.7
+                temperature=0.3 # Lower temperature for more factual answers
             )
             
             answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Post-processing to catch hallucination or partial failures
+            if "not related" in answer.lower():
+                return "This content is not related to the PDF content provided."
+                
             return answer if answer.strip() else "Unable to generate answer."
         except Exception as e:
             print(f"Error answering question: {e}")

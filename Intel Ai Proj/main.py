@@ -2,7 +2,7 @@
 Main entry point for PDF Knowledge Base system
 """
 import os
-from pdf_reader import extract_text_from_pdf, chunk_text
+from pdf_reader import extract_text_and_tables, chunk_text
 from build_vectorstore import VectorStore
 from query_pdf import PDFQueryEngine
 
@@ -19,8 +19,8 @@ def main():
     
     try:
         # Step 1: Extract text from PDF
-        print("📄 Extracting text from PDF...")
-        text = extract_text_from_pdf(pdf_path)
+        print("📄 Extracting text and tables from PDF...")
+        text = extract_text_and_tables(pdf_path)
         
         if not text.strip():
             print("Error: No text found in PDF. Make sure the PDF contains readable text.")
@@ -36,6 +36,7 @@ def main():
         # Step 3: Build vector database
         print("🧠 Building vector database...")
         vector_store = VectorStore()
+        vector_store.clear() # Clear existing data
         vector_store.add_documents(chunks)
         print("✅ Vector database created successfully")
         
