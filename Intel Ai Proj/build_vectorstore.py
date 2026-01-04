@@ -71,3 +71,14 @@ class VectorStore:
         """Wrapper for backward compatibility"""
         docs, _ = self.search_with_score(query, n_results)
         return docs
+
+    def get_by_id(self, doc_id):
+        """Retrieve a specific document by its ID"""
+        try:
+            result = self.collection.get(ids=[doc_id])
+            if result and result['documents']:
+                return result['documents'][0]
+            return None
+        except Exception as e:
+            print(f"Error getting document by ID: {e}")
+            return None

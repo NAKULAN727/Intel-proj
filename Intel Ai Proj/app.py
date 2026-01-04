@@ -116,11 +116,11 @@ with st.sidebar:
 
 # Main Chat Interface
 @st.cache_resource
-def load_engine():
+def load_qa_engine():
     return PDFQueryEngine()
 
 try:
-    engine = load_engine()
+    engine = load_qa_engine()
 except Exception as e:
     st.error(f"Model loading failed: {e}")
     st.stop()
@@ -140,25 +140,20 @@ if prompt := st.chat_input("Ask a question about your document..."):
     # Generate response
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = engine.answer_question(prompt)
+            response, context_chunks = engine.answer_question(prompt)
             st.markdown(response)
             
             # Debug: Show retrieved context
             with st.expander("🔍 Debug: What did the AI read?"):
                 try:
-                    # We need to peek into the engine's retrieval. 
-                    # Since answer_question abstracts this, we'll just re-run search here for debug purposes.
-                    # Ideally, answer_question should return context too.
-                    # For now, quick hack:
-                    context_chunks = engine.vector_store.search(prompt, n_results=3)
                     if context_chunks:
                         for i, chunk in enumerate(context_chunks):
                             st.markdown(f"**Chunk {i+1}:**")
                             st.text(chunk[:300] + "...") # Preview
                     else:
-                        st.warning("No context retrieved from Vector Database.")
-                except:
-                    st.text("Could not retrieve debug context.")
+                        st.warning("No context retrieved.")
+                except Exception as e:
+                    st.text(f"Could not display debug context: {e}")
     
     # Add assistant message to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
