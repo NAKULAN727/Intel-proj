@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────
+# Enterprise PDF Knowledge Base — Requirements
+# ─────────────────────────────────────────────
+# Install: pip install -r requirements.txt
+
+# ── PDF Processing ────────────────────────────
+pymupdf==1.24.0
+pdfplumber==0.11.0
+pytesseract==0.3.10
+Pillow==10.3.0
+
+# ── Vector Store ──────────────────────────────
+chromadb==0.4.24
+sentence-transformers==2.7.0     # MiniLM embeddings + cross-encoder reranker
+
+# ── BM25 Keyword Search ───────────────────────
+rank-bm25==0.2.2
+
+# ── LLM (Transformer fallback) ───────────────
+transformers==4.40.0
+huggingface_hub==0.23.0
+accelerate>=0.27.0
+torch>=2.2.0
+torchvision>=0.17.0
+
+# ── LLM (Phi-3 Mini GGUF — primary, optional) ─
+# Uncomment and run manually after installing build tools:
+# llama-cpp-python
+# Install docs: https://github.com/abetlen/llama-cpp-python
+
+# ── Image Captioning ──────────────────────────
+# transformers + torch already cover BLIP
+
+# ── Storage ───────────────────────────────────
+tinydb==4.8.0
+
+# ── UI ────────────────────────────────────────
+streamlit==1.32.0
+
+# ── Utilities ─────────────────────────────────
+numpy==1.26.4
+urllib3==1.26.18
+pandas>=2.0.0
