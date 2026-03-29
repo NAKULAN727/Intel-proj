@@ -131,19 +131,53 @@ class PDFQueryEngine:
             ), []
 
         # ── Hybrid retrieval ─────────────────────────────────────────────
-        chunks = self.retriever.retrieve(question, top_k=4)
+        chunks = self.retriever.retrieve(question, top_k=5)
 
         if not chunks:
-            context = "No relevant content found in the document."
-        else:
-            parts = [f"[Page {c['page']}] {c['text']}" for c in chunks]
-            context = "\n\n---\n\n".join(parts)
-
+            return "Not found in the document.", []
+            
+        from generation.extractor import classify_query, extract_exact_answer, logger
+        
+        logger.info(f"Retrieved {len(chunks)} chunks for query: '{question}'")
+        for idx, c in enumerate(chunks):
+            logger.info(f"Chunk {idx+1} [Rerank: {c.get('rerank_score', 0)}]: {c['text'][:100]}...")
+            
+        # ── Answer Extraction Layer ──────────────────────────────────────
+        intent = classify_query(question)
+        logger.info(f"Query classified as: {intent.upper()}")
+        
+        if intent == "factual":
+            exact_match = extract_exact_answer(question, chunks)
+            if exact_match:
+                logger.info(f"LLM Bypassed. Final Output: {exact_match}")
+                return exact_match, chunks
+            else:
+                logger.info("Extraction failed. Falling back to LLM.")
+                
         # ── Generate ─────────────────────────────────────────────────────
+        logger.info(f"Passing {len(chunks)} full chunks to LLM without filtering")
+        parts = [f"[Page {c['page']}] {c['text']}" for c in chunks]
+        context = "\n\n---\n\n".join(parts)
+
         if self.use_phi3:
             answer = self._generate_phi3(question, context)
         else:
             answer = self._generate_t5(question, context)
+            
+        # Post-processing & Confidence Check
+        import re
+        
+        # Strip to clean whitespace
+        clean_ans = answer.strip()
+        
+        if len(clean_ans) < 5:
+            answer = "Not found in the document."
+        elif re.match(r'^\[Page\s\d+\][.:]?$', clean_ans, re.IGNORECASE):
+            answer = "Not found in the document."
+        elif "unable" in answer.lower() or "not found" in answer.lower():
+            answer = "Not found in the document."
+            
+        logger.info(f"Final Output: {answer}")
 
         return answer, chunks
 
@@ -154,13 +188,12 @@ class PDFQueryEngine:
     def _generate_phi3(self, question: str, context: str) -> str:
         """Phi-3 Mini with ChatML-format prompt."""
         system_msg = (
-            "You are a precise document assistant. "
-            "Answer questions strictly based on the provided document context. "
-            "Always cite the page number when referencing information "
-            "(e.g. 'According to page 3...'). "
-            "If the answer is not in the context, say: "
-            "'I could not find that in the document.' "
-            "Be concise and accurate."
+            "You are a highly accurate document QA system.\n"
+            "Answer ONLY using the provided context.\n"
+            "Return complete and meaningful answers, not fragments.\n"
+            "If the answer is a sentence, return the full sentence.\n"
+            "If it is a value (name, date, place), return it clearly.\n"
+            "If not found, return: Not found in the document."
         )
         user_msg = (
             f"Document Context:\n{context}\n\n"
@@ -196,9 +229,12 @@ class PDFQueryEngine:
             instruction = "Use the context to answer the question accurately and completely."
 
         prompt = (
-            f"You are a document assistant. {instruction} "
-            f"If the answer is not in the context, say: "
-            f"'I could not find that in the document.'\n\n"
+            f"You are a highly accurate document QA system.\n"
+            f"Answer ONLY using the provided context.\n"
+            f"Return complete and meaningful answers, not fragments.\n"
+            f"If the answer is a sentence, return the full sentence.\n"
+            f"If it is a value (name, date, place), return it clearly.\n"
+            f"If not found, return: Not found in the document.\n\n"
             f"Context:\n{context}\n\n"
             f"Question: {question}\n\nAnswer:"
         )

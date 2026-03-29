@@ -34,7 +34,7 @@ class HybridRetriever:
         # Load BM25 index if it exists on disk
         self.bm25_store.load()
 
-    def retrieve(self, query: str, top_k: int = 4) -> List[Dict]:
+    def retrieve(self, query: str, top_k: int = 5) -> List[Dict]:
         """
         Hybrid retrieval with cross-encoder reranking.
 
@@ -47,10 +47,10 @@ class HybridRetriever:
             sorted by rerank_score descending
         """
         # Step 1: Dense retrieval
-        dense_results = self.vector_store.search(query, n_results=6)
+        dense_results = self.vector_store.search(query, n_results=15)
 
         # Step 2: BM25 retrieval
-        bm25_results = self.bm25_store.search(query, n_results=6)
+        bm25_results = self.bm25_store.search(query, n_results=15)
 
         # Step 3: Merge + deduplicate by text content
         seen_texts: set = set()

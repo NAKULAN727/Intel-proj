@@ -16,19 +16,12 @@ def split_into_sentences(text: str) -> List[str]:
 
 def semantic_chunk(
     pages: List[Dict],
-    chunk_size: int = 5,   # number of sentences per chunk
-    overlap: int = 1       # sentence overlap between consecutive chunks
+    max_words: int = 250,
+    overlap_words: int = 40
 ) -> List[Dict]:
     """
-    Chunk text by sentences while preserving page-level metadata.
-
-    Args:
-        pages: List of {"page": int, "text": str, "source": str}
-        chunk_size: How many sentences per chunk
-        overlap: How many sentences from previous chunk to include
-
-    Returns:
-        List of {"text": str, "page": int, "chunk_index": int, "source": str}
+    Chunk text using a sliding window word-based approach.
+    Normalizes text by replacing newlines with spaces and removing excessive whitespace.
     """
     all_chunks = []
     chunk_index = 0
@@ -36,17 +29,23 @@ def semantic_chunk(
     for page_info in pages:
         page_num = page_info["page"]
         source = page_info.get("source", "unknown.pdf")
-        sentences = split_into_sentences(page_info["text"])
-
-        if not sentences:
+        
+        # Preprocessing: Normalize text
+        text = page_info.get("text", "")
+        text = text.replace("\n", " ")
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        words = text.split()
+        
+        if not words:
             continue
 
-        i = 0
-        while i < len(sentences):
-            window = sentences[i: i + chunk_size]
-            chunk_text = " ".join(window)
-
-            if len(chunk_text.strip()) > 30:  # skip near-empty chunks
+        for i in range(0, len(words), max_words - overlap_words):
+            chunk_words = words[i:i + max_words]
+            chunk_text = " ".join(chunk_words)
+            
+            # Avoid very small chunks (<50 words) unless it's the only chunk for a short doc
+            if len(chunk_words) >= 50 or (len(words) < 50 and i == 0):
                 all_chunks.append({
                     "text": chunk_text,
                     "page": page_num,
@@ -55,6 +54,5 @@ def semantic_chunk(
                 })
                 chunk_index += 1
 
-            i += max(1, chunk_size - overlap)
-
+    print(f"✅ Chunking Complete: Generated {len(all_chunks)} total chunks.")
     return all_chunks

@@ -147,7 +147,7 @@ def _run_ingestion(pdf_file):
             # Step 2: Semantic chunking
             st.write("✂️ Chunking into semantic units...")
             from ingestion.chunker import semantic_chunk
-            chunks = semantic_chunk(pages, chunk_size=5, overlap=1)
+            chunks = semantic_chunk(pages)
             st.write(f"✅ {len(chunks)} chunks created")
 
             if not chunks:

@@ -94,9 +94,26 @@ def extract_pages(pdf_path: str, use_ocr: bool = True) -> list:
                     except Exception as e:
                         print(f"  Image processing failed page {page_num}: {e}")
 
+            # --- Context Cleaning ---
+            cleaned_lines = []
+            import re
+            for line in text.split("\n"):
+                lower_line = line.lower().strip()
+                # Remove noisy lines
+                if "image on page" in lower_line:
+                    continue
+                # Remove repeated headers/footers (e.g., short page numbers, dates)
+                if len(lower_line) < 15 and (lower_line.startswith("page ") or lower_line.isdigit() or re.match(r'^\d{2}/\d{2}/\d{4}$', lower_line)):
+                    continue
+                if "irrelevant instruction" in lower_line or "do not write below" in lower_line:
+                    continue
+                cleaned_lines.append(line)
+                
+            clean_text = "\n".join(cleaned_lines)
+
             pages_data.append({
                 "page": page_num,
-                "text": text,
+                "text": clean_text,
                 "source": source
             })
 
